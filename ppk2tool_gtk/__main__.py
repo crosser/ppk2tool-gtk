@@ -1,4 +1,12 @@
+"""
+GTK4 GUI for ppk2tool
+"""
+
+# python3-gi gir1.2-gtk-4.0 python3-ppk2tool
+
+import os
 import sys
+from tty import setcbreak
 import gi
 
 gi.require_version("Adw", "1")
@@ -6,7 +14,47 @@ gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 gi.require_version("Graphene", "1.0")
 gi.require_version("Pango", "1.0")
-from gi.repository import Gdk, Gtk, Adw, Graphene, Pango
+from gi.repository import Gdk, GLib, Gtk, Adw, Graphene, Pango
+
+from ppk2tool import *
+
+
+class PPK2Source(GLib.Source):
+    def __init__(self, devpath, on_message):
+        super().__init__()
+        self.buffer = bytearray(1024)
+        self.tty = open(
+            devpath,
+            "rb+",
+            buffering=0,
+            opener=lambda nm, flg: os.open(nm, flg | os.O_NOCTTY),
+        )
+        setcbreak(self.tty.fileno())
+        self._fd_tag = self.add_unix_fd(self.tty.fileno(), GLib.IOCondition.IN)
+        self.ctx = PPK2CTX().setcallback(on_message)
+        print("PPK2Source inited from tty", self.tty)
+
+    def send(self, cmd: PPK2Cmd, *args: int) -> None:
+        print("PPK2Source send", cmd, args)
+        self.tty.write(self.ctx.cmd(cmd, *args))
+
+    # GSource virtual methods follow
+
+    def prepare(self):
+        return False, -1
+
+    def check(self):
+        return bool(self.query_unix_fd(self._fd_tag) & GLib.IOCondition.IN)
+
+    def dispatch(self, _callback, _args):
+        length = self.tty.readinto(self.buffer)
+        # print("Read", length, "data", self.buffer[:length])
+        self.ctx.inject(self.buffer[:length])
+        return GLib.SOURCE_CONTINUE
+
+    def close(self) -> None:
+        self.destroy()
+        self.tty.close()
 
 
 class Graph(Gtk.Widget):
@@ -25,9 +73,8 @@ class Graph(Gtk.Widget):
 
 
 class MainWindow(Gtk.ApplicationWindow):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.set_title("PPK2Tool")
+    def __init__(self, app: Gtk.Application):
+        super().__init__(application=app, title="PPK2Tool")
         self.set_default_size(640, 480)
         self.set_child(box := Gtk.Box(orientation=Gtk.Orientation.VERTICAL))
         box.append(button := Gtk.Button(label="Power"))
@@ -35,20 +82,45 @@ class MainWindow(Gtk.ApplicationWindow):
         box.append(graph := Graph())
         print("Added graph object", graph)
 
+        found = 0
+        devname = None
+        for e in os.listdir("/dev/serial/by-id"):
+            if e.startswith("usb-Nordic_Semiconductor_PPK2"):
+                found += 1
+                devname = e
+        if found != 1:
+            print("zero or more than one profiler devices")
+            self.quit()
+        assert devname is not None, "listdir() returned entry None?!"
+        devpath = os.path.join("/dev/serial/by-id", devname)
+        print("Using PPK on", devpath)
+
+        self.ppk = PPK2Source(devpath, self.on_ppk_result)
+        print("Registered source", self.ppk)
+        self.ppk.attach(GLib.MainContext.default())
+
     def hello(self, button):
         print("Clicked", button)
+        self.ppk.send(PPK2Cmd.GET_META_DATA)
+
+    def on_ppk_result(self, cmd: PPK2Cmd, data: PPK2Meta | PPK2Sample) -> None:
+        if isinstance(data, PPK2Meta):
+            self.metadata = data
+            print("metadata", self.metadata)
+            self.vdd = self.metadata.VDD
+        else:
+            print(data)
 
 
 class PPK2App(Adw.Application):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.connect("activate", self.on_activate)
 
-    def on_activate(self, app):
-        self.win = MainWindow(application=app)
-        self.win.present()
+    def do_activate(self):
+        MainWindow(self).present()
 
 
 if __name__ == "__main__":
     app = PPK2App(application_id="org.average.ppk2tool")
-    app.run()
+    try:
+        app.run()
+    except KeyboardInterrupt:
+        app.quit()
