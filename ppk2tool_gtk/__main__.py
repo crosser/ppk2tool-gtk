@@ -75,6 +75,11 @@ class Graph(Gtk.Widget):
 class MainWindow(Gtk.ApplicationWindow):
     def __init__(self, app: Gtk.Application):
         super().__init__(application=app, title="PPK2Tool")
+
+        kctrl = Gtk.EventControllerKey()
+        kctrl.connect("key-pressed", self.on_keypress, None)
+        self.add_controller(kctrl)
+
         self.set_default_size(640, 480)
         self.set_child(box := Gtk.Box(orientation=Gtk.Orientation.VERTICAL))
         box.append(button := Gtk.Button(label="Power"))
@@ -90,7 +95,8 @@ class MainWindow(Gtk.ApplicationWindow):
                 devname = e
         if found != 1:
             print("zero or more than one profiler devices")
-            self.quit()
+            self.close()
+            exit(1)
         assert devname is not None, "listdir() returned entry None?!"
         devpath = os.path.join("/dev/serial/by-id", devname)
         print("Using PPK on", devpath)
@@ -98,6 +104,17 @@ class MainWindow(Gtk.ApplicationWindow):
         self.ppk = PPK2Source(devpath, self.on_ppk_result)
         print("Registered source", self.ppk)
         self.ppk.attach(GLib.MainContext.default())
+
+    def on_keypress(
+        self,
+        _event: Gtk.Event,
+        keyval: int,
+        _keycode: int,
+        state: Gdk.ModifierType,
+        _udata: Literal[None],
+    ) -> None:
+        if keyval == Gdk.KEY_q and state & Gdk.ModifierType.CONTROL_MASK:
+            self.close()
 
     def hello(self, button):
         print("Clicked", button)
