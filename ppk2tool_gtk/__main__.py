@@ -93,17 +93,18 @@ class Graph(Gtk.Widget):
 
         for i, (mn, av, mx) in enumerate(self.hist):
             # print("Values", i, mn, av, mx)
+            x = x0 + i * w // 1000
             colour.parse("#00ff00")
             y1 = log10(mx * 100000.0) * h // 5
             y2 = log10(mn * 100000.0) * h // 5
             # print("y1", y1, "y2", y2)
             s.append_color(
-                colour, Graphene.Rect().init(x0 + i, h + y0 - y1, 1, y1 - y2)
+                colour, Graphene.Rect().init(x, h + y0 - y1, 1, y1 - y2)
             )
             colour.parse("#ff0000")
             y = log10(av * 100000.0) * h // 5
             s.append_color(
-                colour, Graphene.Rect().init(x0 + i, h + y0 - y - 2, 1, 4)
+                colour, Graphene.Rect().init(x, h + y0 - y - 2, 1, 4)
             )
 
         font = Pango.FontDescription.new()
@@ -134,16 +135,17 @@ class Graph(Gtk.Widget):
                     colour, Graphene.Rect().init(x0, h + y0 - y, w, 1)
                 )
         colour.parse("#ffffff")
-        for i in range(6):
+        for i in range(11):
             layout.set_text(str(i))
-            point.x = x0 + i * w // 5 - 5
+            x = x0 + i * w // 10
+            point.x = x - 5
             point.y = h + y0
             s.save()
             s.translate(point)
             s.append_layout(layout, colour)
             s.restore()
             s.append_color(
-                colour, Graphene.Rect().init(x0 + i * w // 5, y0, 1, h)
+                colour, Graphene.Rect().init(x, y0, 1, h)
             )
         # colour.parse("#00ff00")
         # for i in range(100000):
