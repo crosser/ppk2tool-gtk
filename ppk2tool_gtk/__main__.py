@@ -4,6 +4,7 @@ GTK4 GUI for ppk2tool
 
 # python3-gi gir1.2-gtk-4.0 python3-ppk2tool
 
+from collections import deque
 from math import log10
 import os
 import sys
@@ -30,6 +31,7 @@ LABELS = {
     10000: "100mA",
     100000: "1A",
 }
+
 
 class PPK2Source(GLib.Source):
     def __init__(self, devpath, on_message):
@@ -70,8 +72,9 @@ class PPK2Source(GLib.Source):
 
 
 class Graph(Gtk.Widget):
-    def __init__(self):
+    def __init__(self, hist):
         super().__init__()
+        self.hist = hist
         # self.set_hexpand(True)
         # self.set_vexpand(True)
         self.set_size_request(D_WIDTH, D_HEIGHT)
@@ -87,6 +90,21 @@ class Graph(Gtk.Widget):
         y0 = 10
         w = w - x0 - 10
         h = h - y0 - 30
+
+        for i, (mn, av, mx) in enumerate(self.hist):
+            # print("Values", i, mn, av, mx)
+            colour.parse("#00ff00")
+            y1 = log10(mx * 100000.0) * h // 5
+            y2 = log10(mn * 100000.0) * h // 5
+            # print("y1", y1, "y2", y2)
+            s.append_color(
+                colour, Graphene.Rect().init(x0 + i, h + y0 - y1, 1, y1 - y2)
+            )
+            colour.parse("#ff0000")
+            y = log10(av * 100000.0) * h // 5
+            s.append_color(
+                colour, Graphene.Rect().init(x0 + i, h + y0 - y - 2, 1, 4)
+            )
 
         font = Pango.FontDescription.new()
         font.set_family("Sans")
@@ -127,18 +145,21 @@ class Graph(Gtk.Widget):
             s.append_color(
                 colour, Graphene.Rect().init(x0 + i * w // 5, y0, 1, h)
             )
-        colour.parse("#00ff00")
-        for i in range(100000):
-            y = log10(i + 1) * h // 5
-            s.append_color(
-                colour,
-                Graphene.Rect().init(x0 + i * w // 100000, h + y0 - y, 1, 1),
-            )
+        # colour.parse("#00ff00")
+        # for i in range(100000):
+        #     y = log10(i + 1) * h // 5
+        #     s.append_color(
+        #         colour,
+        #         Graphene.Rect().init(x0 + i * w // 100000, h + y0 - y, 1, 1),
+        #     )
 
 
 class MainWindow(Gtk.ApplicationWindow):
     def __init__(self, app: Gtk.Application):
         super().__init__(application=app, title="PPK2Tool")
+
+        self.hist = deque(maxlen=1000)
+        GLib.timeout_add(10, self.periodic, None)
 
         kctrl = Gtk.EventControllerKey()
         kctrl.connect("key-pressed", self.on_keypress, None)
@@ -147,7 +168,8 @@ class MainWindow(Gtk.ApplicationWindow):
         self.set_child(box := Gtk.Box(orientation=Gtk.Orientation.VERTICAL))
         box.append(button := Gtk.Button(label="Power"))
         button.connect("clicked", self.hello)
-        box.append(graph := Graph())
+        self.graph = Graph(self.hist)
+        box.append(self.graph)
 
         devmon = Gio.File.new_for_path("/dev").monitor_directory(
             Gio.FileMonitorFlags.NONE
@@ -218,6 +240,12 @@ class MainWindow(Gtk.ApplicationWindow):
             self.vdd = self.metadata.VDD
         else:
             print(data)
+
+    def periodic(self, _: Any) -> Literal[True]:
+        # print("Periodic called")
+        self.hist.append((0.001, 0.01, 0.1))
+        self.graph.queue_draw()
+        return True
 
 
 class PPK2App(Adw.Application):
