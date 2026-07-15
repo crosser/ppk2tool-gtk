@@ -4,6 +4,7 @@ GTK4 GUI for ppk2tool
 
 # python3-gi gir1.2-gtk-4.0 python3-ppk2tool
 
+from math import log10
 import os
 import sys
 from tty import setcbreak
@@ -18,6 +19,17 @@ from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Graphene, Pango
 
 from ppk2tool import *
 
+D_WIDTH = 1200
+D_HEIGHT = 800
+
+LABELS = {
+    1: "10μA",
+    10: "100μA",
+    100: "1mA",
+    1000: "10mA",
+    10000: "100mA",
+    100000: "1A",
+}
 
 class PPK2Source(GLib.Source):
     def __init__(self, devpath, on_message):
@@ -60,16 +72,68 @@ class PPK2Source(GLib.Source):
 class Graph(Gtk.Widget):
     def __init__(self):
         super().__init__()
-        self.set_hexpand(True)
-        self.set_vexpand(True)
+        # self.set_hexpand(True)
+        # self.set_vexpand(True)
+        self.set_size_request(D_WIDTH, D_HEIGHT)
 
     def do_snapshot(self, s):
+        w = self.get_width()
+        h = self.get_height()
         colour = Gdk.RGBA()
         colour.parse("#000000")
-        rect = Graphene.Rect().init(
-            10, 10, self.get_width() - 20, self.get_height() - 20
-        )
+        rect = Graphene.Rect().init(0, 0, w, h)
         s.append_color(colour, rect)
+        x0 = 65
+        y0 = 10
+        w = w - x0 - 10
+        h = h - y0 - 30
+
+        font = Pango.FontDescription.new()
+        font.set_family("Sans")
+        font.set_size(12 * Pango.SCALE)
+        layout = Pango.Layout.new(self.get_pango_context())
+        layout.set_font_description(font)
+        point = Graphene.Point()
+        band = 1
+        for i in range(1, 100001):  # 10 uA to 1 A
+            if i >= band * 10:
+                band *= 10
+            if i // band and not i % band:
+                y = log10(i) * h // 5
+                # print("band =", band, "i =", i, "y =", y)
+                if i == band:
+                    colour.parse("#ffffff")
+                    layout.set_text(LABELS[band])
+                    point.x = x0 - 55
+                    point.y = h + y0 - y - 10
+                    s.save()
+                    s.translate(point)
+                    s.append_layout(layout, colour)
+                    s.restore()
+                else:
+                    colour.parse("#808080")
+                s.append_color(
+                    colour, Graphene.Rect().init(x0, h + y0 - y, w, 1)
+                )
+        colour.parse("#ffffff")
+        for i in range(6):
+            layout.set_text(str(i))
+            point.x = x0 + i * w // 5 - 5
+            point.y = h + y0
+            s.save()
+            s.translate(point)
+            s.append_layout(layout, colour)
+            s.restore()
+            s.append_color(
+                colour, Graphene.Rect().init(x0 + i * w // 5, y0, 1, h)
+            )
+        colour.parse("#00ff00")
+        for i in range(100000):
+            y = log10(i + 1) * h // 5
+            s.append_color(
+                colour,
+                Graphene.Rect().init(x0 + i * w // 100000, h + y0 - y, 1, 1),
+            )
 
 
 class MainWindow(Gtk.ApplicationWindow):
@@ -80,12 +144,10 @@ class MainWindow(Gtk.ApplicationWindow):
         kctrl.connect("key-pressed", self.on_keypress, None)
         self.add_controller(kctrl)
 
-        self.set_default_size(640, 480)
         self.set_child(box := Gtk.Box(orientation=Gtk.Orientation.VERTICAL))
         box.append(button := Gtk.Button(label="Power"))
         button.connect("clicked", self.hello)
         box.append(graph := Graph())
-        print("Added graph object", graph)
 
         devmon = Gio.File.new_for_path("/dev").monitor_directory(
             Gio.FileMonitorFlags.NONE
