@@ -203,7 +203,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.ppk = PPK2Source(devpath, self.on_ppk_result)
         print("Registered source", self.ppk)
         self.ppk.attach(GLib.MainContext.default())
-        return true
+        return True
 
     def on_devchange(
         self,
