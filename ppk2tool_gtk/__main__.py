@@ -8,15 +8,25 @@ from collections import deque
 from math import log10
 import os
 import sys
+from typing import Any, Callable, Literal
+
 from tty import setcbreak
-import gi
+import gi  # type: ignore [import-untyped]
 
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 gi.require_version("Graphene", "1.0")
 gi.require_version("Pango", "1.0")
-from gi.repository import Adw, Gdk, Gio, GLib, Gtk, Graphene, Pango
+from gi.repository import (  # type: ignore [import-untyped]
+    Adw,
+    Gdk,
+    Gio,
+    GLib,
+    Gtk,
+    Graphene,
+    Pango,
+)
 
 from ppk2tool import *
 
@@ -33,8 +43,12 @@ LABELS = {
 }
 
 
-class PPK2Source(GLib.Source):
-    def __init__(self, devpath, on_message):
+class PPK2Source(GLib.Source):  # type: ignore [misc]
+    def __init__(
+        self,
+        devpath: str,
+        on_message: Callable[[PPK2Cmd, PPK2Meta | PPK2Sample], None],
+    ) -> None:
         super().__init__()
         self.buffer = bytearray(1024)
         self.tty = open(
@@ -54,13 +68,13 @@ class PPK2Source(GLib.Source):
 
     # GSource virtual methods follow
 
-    def prepare(self):
+    def prepare(self) -> tuple[bool, int]:
         return False, -1
 
-    def check(self):
+    def check(self) -> bool:
         return bool(self.query_unix_fd(self._fd_tag) & GLib.IOCondition.IN)
 
-    def dispatch(self, _callback, _args):
+    def dispatch(self, _callback: Any, _args: Any) -> Any:  # actually -> bool
         length = self.tty.readinto(self.buffer)
         # print("Read", length, "data", self.buffer[:length])
         self.ctx.inject(self.buffer[:length])
@@ -71,15 +85,15 @@ class PPK2Source(GLib.Source):
         self.tty.close()
 
 
-class Graph(Gtk.Widget):
-    def __init__(self, hist):
+class Graph(Gtk.Widget):  # type: ignore [misc]
+    def __init__(self, hist: deque[tuple[float, float, float]]) -> None:
         super().__init__()
         self.hist = hist
         # self.set_hexpand(True)
         # self.set_vexpand(True)
         self.set_size_request(D_WIDTH, D_HEIGHT)
 
-    def do_snapshot(self, s):
+    def do_snapshot(self, s: Graphene.Snapshot) -> None:
         w = self.get_width()
         h = self.get_height()
         colour = Gdk.RGBA()
@@ -144,9 +158,7 @@ class Graph(Gtk.Widget):
             s.translate(point)
             s.append_layout(layout, colour)
             s.restore()
-            s.append_color(
-                colour, Graphene.Rect().init(x, y0, 1, h)
-            )
+            s.append_color(colour, Graphene.Rect().init(x, y0, 1, h))
         # colour.parse("#00ff00")
         # for i in range(100000):
         #     y = log10(i + 1) * h // 5
@@ -156,11 +168,11 @@ class Graph(Gtk.Widget):
         #     )
 
 
-class MainWindow(Gtk.ApplicationWindow):
+class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
     def __init__(self, app: Gtk.Application):
         super().__init__(application=app, title="PPK2Tool")
 
-        self.hist = deque(maxlen=1000)
+        self.hist: deque[tuple[float, float, float]] = deque(maxlen=1000)
         GLib.timeout_add(10, self.periodic, None)
 
         kctrl = Gtk.EventControllerKey()
@@ -212,7 +224,7 @@ class MainWindow(Gtk.ApplicationWindow):
         other: Gio.File,
         evtype: Gio.FileMonitorEvent,
         _: Literal[None],
-    ):
+    ) -> None:
         print("dev event", fmon, file, other, evtype)
         if self.findppk():
             print("PPK2 initialised")
@@ -230,7 +242,7 @@ class MainWindow(Gtk.ApplicationWindow):
         if keyval == Gdk.KEY_q and state & Gdk.ModifierType.CONTROL_MASK:
             self.close()
 
-    def hello(self, button):
+    def hello(self, button: Gtk.Widget) -> None:
         print("Clicked", button)
         if self.ppk:
             self.ppk.send(PPK2Cmd.GET_META_DATA)
@@ -250,9 +262,9 @@ class MainWindow(Gtk.ApplicationWindow):
         return True
 
 
-class PPK2App(Adw.Application):
+class PPK2App(Adw.Application):  # type: ignore [misc]
 
-    def do_activate(self):
+    def do_activate(self) -> None:
         MainWindow(self).present()
 
 
