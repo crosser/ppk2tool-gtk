@@ -42,6 +42,16 @@ LABELS = {
     100000: "1A",
 }
 
+Gtk.init()
+
+
+def spacepad(what: Gtk.Widget) -> None:
+    what.set_spacing(5)
+    what.set_margin_top(5)
+    what.set_margin_bottom(5)
+    what.set_margin_start(5)
+    what.set_margin_end(5)
+
 
 class PPK2Source(GLib.Source):  # type: ignore [misc]
     def __init__(
@@ -60,7 +70,7 @@ class PPK2Source(GLib.Source):  # type: ignore [misc]
         setcbreak(self.tty.fileno())
         self._fd_tag = self.add_unix_fd(self.tty.fileno(), GLib.IOCondition.IN)
         self.ctx = PPK2CTX().setcallback(on_message)
-        print("PPK2Source inited from tty", self.tty)
+        # print("PPK2Source inited from tty", self.tty)
 
     def send(self, cmd: PPK2Cmd, *args: int) -> None:
         print("PPK2Source send", cmd, args)
@@ -159,20 +169,19 @@ class Graph(Gtk.Widget):  # type: ignore [misc]
             s.append_layout(layout, colour)
             s.restore()
             s.append_color(colour, Graphene.Rect().init(x, y0, 1, h))
-        # colour.parse("#00ff00")
-        # for i in range(100000):
-        #     y = log10(i + 1) * h // 5
-        #     s.append_color(
-        #         colour,
-        #         Graphene.Rect().init(x0 + i * w // 100000, h + y0 - y, 1, 1),
-        #     )
 
 
 class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
     def __init__(self, app: Gtk.Application):
         super().__init__(application=app, title="PPK2Tool")
 
+        self.voltage: float = 3.7
+        self.passthrough: bool = False
         self.hist: deque[tuple[float, float, float]] = deque(maxlen=1000)
+        self.min = 1.0
+        self.max = 0.00001
+        self.avg = 0.00001
+        self.count = 0
         GLib.timeout_add(10, self.periodic, None)
 
         kctrl = Gtk.EventControllerKey()
@@ -180,21 +189,38 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.add_controller(kctrl)
 
         self.set_child(box := Gtk.Box(orientation=Gtk.Orientation.VERTICAL))
-        box.append(button := Gtk.Button(label="Power"))
-        button.connect("clicked", self.hello)
+
+        box.append(topbox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL))
+        spacepad(topbox)
+        topbox.set_spacing(5)
+        topbox.append(pwrswitch := Gtk.Switch())
+        pwrswitch.set_active(False)
+        pwrswitch.connect("state-set", self.on_pwrchange)
+        topbox.append(Gtk.Label(label="Power"))
+        topbox.append(measureswitch := Gtk.Switch())
+        measureswitch.set_active(False)
+        measureswitch.connect("state-set", self.on_measurechange)
+        topbox.append(Gtk.Label(label="Measure"))
+
+        box.append(midbox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL))
+        spacepad(midbox)
         self.graph = Graph(self.hist)
-        box.append(self.graph)
+        midbox.append(self.graph)
+
+        box.append(
+            bottombox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        )
+        spacepad(bottombox)
+        self.bottom = Gtk.Label(label="No PPK2 Connected")
+        bottombox.append(self.bottom)
 
         devmon = Gio.File.new_for_path("/dev").monitor_directory(
             Gio.FileMonitorFlags.NONE
         )
         devmon.connect("changed", self.on_devchange, None)
-        if self.findppk():
-            print("PPK2 initialised")
-        else:
-            print("No PPK2")
+        self.findppk()
 
-    def findppk(self) -> bool:
+    def findppk(self) -> None:
         found = 0
         devname = None
         try:
@@ -205,17 +231,23 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         except FileNotFoundError:
             pass
         if found != 1:
-            print("zero or more than one profiler devices")
+            if self.ppk:
+                self.ppk.close()
             self.ppk = None
-            return False
+            self.bottom.set_text("zero or more than one profiler devices")
+            return
+
         assert devname is not None, "listdir() returned entry None?!"
         devpath = os.path.join("/dev/serial/by-id", devname)
-        print("Using PPK on", devpath)
 
         self.ppk = PPK2Source(devpath, self.on_ppk_result)
-        print("Registered source", self.ppk)
         self.ppk.attach(GLib.MainContext.default())
-        return True
+        self.ppk.send(
+            PPK2Cmd.REGULATOR_SET, *divmod(int(self.voltage * 1000.0), 256)
+        )
+        self.ppk.send(PPK2Cmd.SET_POWER_MODE, 1 if self.passthrough else 2)
+        self.ppk.send(PPK2Cmd.GET_META_DATA)
+        self.bottom.set_text(devpath[devpath.rfind("/") + 1 :])
 
     def on_devchange(
         self,
@@ -226,10 +258,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         _: Literal[None],
     ) -> None:
         print("dev event", fmon, file, other, evtype)
-        if self.findppk():
-            print("PPK2 initialised")
-        else:
-            print("No PPK2")
+        self.findppk()
 
     def on_keypress(
         self,
@@ -242,10 +271,17 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         if keyval == Gdk.KEY_q and state & Gdk.ModifierType.CONTROL_MASK:
             self.close()
 
-    def hello(self, button: Gtk.Widget) -> None:
-        print("Clicked", button)
+    def on_pwrchange(self, switch: Gtk.Widget, state: bool) -> None:
+        print("power", "on" if state else "off")
         if self.ppk:
-            self.ppk.send(PPK2Cmd.GET_META_DATA)
+            self.ppk.send(PPK2Cmd.DEVICE_RUNNING_SET, int(state))
+
+    def on_measurechange(self, switch: Gtk.Widget, state: bool) -> None:
+        print("measuring" if state else "stopped")
+        if self.ppk:
+            self.ppk.send(
+                PPK2Cmd.AVERAGE_START if state else PPK2Cmd.AVERAGE_STOP
+            )
 
     def on_ppk_result(self, cmd: PPK2Cmd, data: PPK2Meta | PPK2Sample) -> None:
         if isinstance(data, PPK2Meta):
@@ -253,12 +289,28 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
             print("metadata", self.metadata)
             self.vdd = self.metadata.VDD
         else:
-            print(data)
+            # print(data)
+            amps = data.amps
+            if amps < 0.00001:
+                amps = 0.00001
+            elif amps > 1.0:
+                amps = 1.0
+            if amps > self.max:
+                self.max = amps
+            if amps < self.min:
+                self.min = amps
+            self.avg = self.avg * 0.99 + amps * 0.01
+            self.count += 1
 
     def periodic(self, _: Any) -> Literal[True]:
-        # print("Periodic called")
-        self.hist.append((0.001, 0.01, 0.1))
-        self.graph.queue_draw()
+        # print("Periodic called after", self.count, "samples")
+        if self.count:
+            self.hist.append((self.min, self.avg, self.max))
+            self.min = 1.0
+            self.max = 0.00001
+            self.avg = 0.00001
+            self.count = 0
+            self.graph.queue_draw()
         return True
 
 
