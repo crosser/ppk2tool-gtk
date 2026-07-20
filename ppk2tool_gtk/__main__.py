@@ -182,6 +182,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.max = 0.00001
         self.avg = 0.00001
         self.count = 0
+        self.ppk: None | PPK2Ctx = None
         GLib.timeout_add(10, self.periodic, None)
 
         kctrl = Gtk.EventControllerKey()
@@ -308,7 +309,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
             self.hist.append((self.min, self.avg, self.max))
             self.min = 1.0
             self.max = 0.00001
-            self.avg = 0.00001
+            # self.avg = 0.00001
             self.count = 0
             self.graph.queue_draw()
         return True
