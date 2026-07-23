@@ -10,6 +10,8 @@ import os
 import sys
 from typing import Any, Callable, Literal
 
+from dbus import SessionBus, String  # type: ignore [import-untyped]
+from dbus.mainloop.glib import DBusGMainLoop  # type: ignore [import-untyped]
 from tty import setcbreak
 import gi  # type: ignore [import-untyped]
 
@@ -182,7 +184,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.max = 0.00001
         self.avg = 0.00001
         self.count = 0
-        self.ppk: None | PPK2Ctx = None
+        self.ppk: None | PPK2Source = None
         GLib.timeout_add(10, self.periodic, None)
 
         kctrl = Gtk.EventControllerKey()
@@ -215,10 +217,9 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.bottom = Gtk.Label(label="No PPK2 Connected")
         bottombox.append(self.bottom)
 
-        devmon = Gio.File.new_for_path("/dev").monitor_directory(
-            Gio.FileMonitorFlags.NONE
+        SessionBus(mainloop=DBusGMainLoop()).add_signal_receiver(
+            self.on_devchange, member_keyword="UnitNew"
         )
-        devmon.connect("changed", self.on_devchange, None)
         self.findppk()
 
     def findppk(self) -> None:
@@ -250,16 +251,14 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.ppk.send(PPK2Cmd.GET_META_DATA)
         self.bottom.set_text(devpath[devpath.rfind("/") + 1 :])
 
-    def on_devchange(
-        self,
-        fmon: Gio.FileMonitor,
-        file: Gio.File,
-        other: Gio.File,
-        evtype: Gio.FileMonitorEvent,
-        _: Literal[None],
-    ) -> None:
-        print("dev event", fmon, file, other, evtype)
-        self.findppk()
+    def on_devchange(self, *args: Any, UnitNew: None | str) -> None:
+        if (
+            args
+            and isinstance(args[0], String)
+            and "Nordic_Semiconductor_PPK2" in args[0]
+        ):
+            # print("dev event", UnitNew)
+            self.findppk()
 
     def on_keypress(
         self,
