@@ -72,6 +72,7 @@ class PPK2Source(GLib.Source):  # type: ignore [misc]
         setcbreak(self.tty.fileno())
         self._fd_tag = self.add_unix_fd(self.tty.fileno(), GLib.IOCondition.IN)
         self.ctx = PPK2CTX().setcallback(on_message)
+        self.devpath = devpath
         # print("PPK2Source inited from tty", self.tty)
 
     def send(self, cmd: PPK2Cmd, *args: int) -> None:
@@ -241,6 +242,15 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
 
         assert devname is not None, "listdir() returned entry None?!"
         devpath = os.path.join("/dev/serial/by-id", devname)
+        if self.ppk:
+            if self.ppk.devpath == devpath:
+                print(
+                    "ignoring devchange event for an already open ppk", devpath
+                )
+                return
+            else:
+                print("new device, closing the old one")
+                self.ppk.close()
 
         self.ppk = PPK2Source(devpath, self.on_ppk_result)
         self.ppk.attach(GLib.MainContext.default())
