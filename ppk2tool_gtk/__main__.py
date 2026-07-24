@@ -292,12 +292,14 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
                 PPK2Cmd.AVERAGE_START if state else PPK2Cmd.AVERAGE_STOP
             )
 
-    def on_ppk_result(self, cmd: PPK2Cmd, data: PPK2Meta | PPK2Sample) -> None:
+    def on_ppk_result(
+        self, cmd: PPK2Cmd, data: PPK2Meta | PPK2Sample | PPK2Stats
+    ) -> None:
         if isinstance(data, PPK2Meta):
             self.metadata = data
             print("metadata", self.metadata)
             self.vdd = self.metadata.VDD
-        else:
+        elif isinstance(data, PPK2Sample):
             # print(data)
             amps = data.amps
             if amps < 0.00001:
@@ -310,6 +312,10 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
                 self.min = amps
             self.avg = self.avg * 0.99 + amps * 0.01
             self.count += 1
+        elif isinstance(data, PPK2Stats):
+            pass
+        else:
+            print("Unhandled data:", data)
 
     def periodic(self, _: Any) -> Literal[True]:
         # print("Periodic called after", self.count, "samples")
