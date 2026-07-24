@@ -10,7 +10,7 @@ import os
 import sys
 from typing import Any, Callable, Literal
 
-from dbus import SessionBus, String  # type: ignore [import-untyped]
+from dbus import SystemBus, String  # type: ignore [import-untyped]
 from dbus.mainloop.glib import DBusGMainLoop  # type: ignore [import-untyped]
 from tty import setcbreak
 import gi  # type: ignore [import-untyped]
@@ -218,7 +218,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.bottom = Gtk.Label(label="No PPK2 Connected")
         bottombox.append(self.bottom)
 
-        SessionBus(mainloop=DBusGMainLoop()).add_signal_receiver(
+        SystemBus(mainloop=DBusGMainLoop()).add_signal_receiver(
             self.on_devchange, member_keyword="UnitNew"
         )
         self.findppk()
@@ -263,11 +263,10 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
 
     def on_devchange(self, *args: Any, UnitNew: None | str) -> None:
         if (
-            args
-            and isinstance(args[0], String)
+            UnitNew in ("UnitNew", "UnitRemoved")
             and "Nordic_Semiconductor_PPK2" in args[0]
         ):
-            # print("dev event", UnitNew)
+            # print("dev event", args, UnitNew)
             self.findppk()
 
     def on_keypress(
