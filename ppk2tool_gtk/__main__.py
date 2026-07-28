@@ -184,6 +184,8 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.min = 1.0
         self.max = 0.00001
         self.avg = 0.00001
+        self.too_fresh: int = 0
+        self.prev_band: int | None = None
         self.count = 0
         self.ppk: None | PPK2Source = None
         GLib.timeout_add(10, self.periodic, None)
@@ -301,6 +303,17 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
             self.vdd = self.metadata.VDD
         elif isinstance(data, PPK2Sample):
             # print(data)
+            if self.prev_band is None:
+                self.prev_band = data.band
+            if data.band != self.prev_band:
+                self.too_fresh = 4
+                self.prev_band = data.band
+            if self.too_fresh:
+                self.too_fresh -= 1
+                return
+
+            alpha = 0.06 if data.band == 4 else 0.18
+            beta = 1.0 - alpha
             amps = data.amps
             if amps < 0.00001:
                 amps = 0.00001
@@ -310,7 +323,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
                 self.max = amps
             if amps < self.min:
                 self.min = amps
-            self.avg = self.avg * 0.99 + amps * 0.01
+            self.avg = self.avg * beta + amps * alpha
             self.count += 1
         elif isinstance(data, PPK2Stats):
             pass
