@@ -185,6 +185,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.max = 0.00001
         self.avg = 0.00001
         self.too_fresh: int = 0
+        self.after_spike: int = 0
         self.prev_band: int | None = None
         self.count = 0
         self.ppk: None | PPK2Source = None
@@ -308,8 +309,15 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
             if data.band != self.prev_band:
                 self.too_fresh = 4
                 self.prev_band = data.band
+            if data.amps > 1.0:
+                # print("Spike", data, "prevband", self.prev_band,
+                #       "too_fresh", self.too_fresh)
+                self.after_spike = 3
+            if self.after_spike:
+                self.after_spike -= 1
             if self.too_fresh:
                 self.too_fresh -= 1
+            if self.after_spike or self.too_fresh:
                 return
 
             alpha = 0.06 if data.band == 4 else 0.18
