@@ -21,6 +21,9 @@ class PPK2App(Adw.Application):  # type: ignore [misc]
         MainWindow(self).present()
 
 
+Gtk.init()
+
+
 def main() -> None:
     """
     Main entry point, for the benefit of pyproject's "scripts" idiosyncrasy

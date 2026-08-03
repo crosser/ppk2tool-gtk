@@ -23,20 +23,6 @@ from gi.repository import (  # type: ignore [import-untyped]
 from ppk2tool import *
 from .graph import Graph
 
-D_WIDTH = 800
-D_HEIGHT = 400
-
-LABELS = {
-    1: "10μA",
-    10: "100μA",
-    100: "1mA",
-    1000: "10mA",
-    10000: "100mA",
-    100000: "1A",
-}
-
-Gtk.init()
-
 
 def spacepad(what: Gtk.Widget) -> None:
     what.set_spacing(5)
@@ -95,7 +81,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
     def __init__(self, app: Gtk.Application):
         super().__init__(application=app, title="PPK2Tool")
 
-        self.voltage: float = 3.7
+        self.vdd: float = 3.7
         self.passthrough: bool = False
         self.hist: deque[tuple[float, float, float]] = deque(maxlen=1000)
         self.min = 1.0
@@ -115,13 +101,24 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         spacepad(topbox)
         topbox.set_spacing(5)
         topbox.append(pwrswitch := Gtk.Switch())
+        pwrswitch.set_valign(Gtk.Align.CENTER)
         pwrswitch.set_active(False)
         pwrswitch.connect("state-set", self.on_pwrchange)
         topbox.append(Gtk.Label(label="Power"))
         topbox.append(measureswitch := Gtk.Switch())
+        measureswitch.set_valign(Gtk.Align.CENTER)
         measureswitch.set_active(False)
         measureswitch.connect("state-set", self.on_measurechange)
         topbox.append(Gtk.Label(label="Measure"))
+        self.voltage = Gtk.SpinButton(orientation=Gtk.Orientation.HORIZONTAL)
+        topbox.append(self.voltage)
+        self.voltage.props.adjustment = Gtk.Adjustment(
+            lower=0.8, upper=5.0, step_increment=0.01, page_increment=0.2
+        )
+        self.voltage.props.digits = 2
+        self.voltage.set_numeric(True)
+        self.voltage.set_value(self.vdd)
+        self.voltage.connect("value-changed", self.on_voltage)
 
         box.append(midbox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL))
         spacepad(midbox)
@@ -172,7 +169,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.ppk = PPK2Source(devpath, self.on_ppk_result)
         self.ppk.attach(GLib.MainContext.default())
         self.ppk.send(
-            PPK2Cmd.REGULATOR_SET, *divmod(int(self.voltage * 1000.0), 256)
+            PPK2Cmd.REGULATOR_SET, *divmod(int(self.vdd * 1000.0), 256)
         )
         self.ppk.send(PPK2Cmd.SET_POWER_MODE, 1 if self.passthrough else 2)
         self.ppk.send(PPK2Cmd.GET_META_DATA)
@@ -209,13 +206,22 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
                 PPK2Cmd.AVERAGE_START if state else PPK2Cmd.AVERAGE_STOP
             )
 
+    def on_voltage(self, sbtn: Gtk.Widget) -> None:
+        self.vdd = sbtn.get_value()
+        if self.ppk:
+            self.ppk.send(
+                PPK2Cmd.REGULATOR_SET, *divmod(int(self.vdd * 1000.0), 256)
+            )
+
+
     def on_ppk_result(
         self, cmd: PPK2Cmd, data: PPK2Meta | PPK2Sample | PPK2Stats
     ) -> None:
         if isinstance(data, PPK2Meta):
             self.metadata = data
             print("metadata", self.metadata)
-            self.vdd = self.metadata.VDD
+            self.vdd = self.metadata.VDD / 1000.0
+            self.voltage.set_value(self.vdd)
         elif isinstance(data, PPK2Sample):
             # print(data)
             if data.amps > self.max:
