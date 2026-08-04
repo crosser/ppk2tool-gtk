@@ -88,6 +88,8 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.max = 0.00001
         self.avg = 0.00001
         self.count = 0
+        self.amps = 0.0
+        self.ampcount = 0
         self.ppk: None | PPK2Source = None
         GLib.timeout_add(10, self.periodic, None)
 
@@ -243,5 +245,10 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
             self.max = 0.00001
             # self.avg = 0.00001
             self.count = 0
+            self.amps = self.avg * 0.1 + self.amps * 0.9
+            self.ampcount += 1
+            if self.ampcount >= 10:
+                # self.amplabel.set_value
+                self.ampcount = 0
             self.graph.queue_draw()
         return True
