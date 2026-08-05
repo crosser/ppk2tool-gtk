@@ -1,3 +1,16 @@
+ppk2tool-gtk (0.2) unstable; urgency=medium
+
+  * Add style tests
+  * Add README
+  * Configure github action to build package
+  * Use curl --location instead of --follow
+  * github action: use setup-hook for ci-prepare.sh
+  * Use "ubuntu-latest" as a build container
+  * Install curl and jq in the container before use
+  * add dependency on python3-dbus
+
+ -- Eugene Crosser <crosser@average.org>  Wed, 05 Aug 2026 22:34:25 +0200
+
 ppk2tool-gtk (0.1) unstable; urgency=medium
 
   * Initial version
