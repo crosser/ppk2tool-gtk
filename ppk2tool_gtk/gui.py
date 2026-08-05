@@ -109,16 +109,17 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         box.append(topbox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL))
         spacepad(topbox)
         topbox.set_spacing(5)
-        topbox.append(pwrswitch := Gtk.Switch())
-        pwrswitch.set_valign(Gtk.Align.CENTER)
-        pwrswitch.set_active(False)
-        pwrswitch.connect("state-set", self.on_pwrchange)
-        topbox.append(Gtk.Label(label="Power"))
-        topbox.append(measureswitch := Gtk.Switch())
-        measureswitch.set_valign(Gtk.Align.CENTER)
-        measureswitch.set_active(False)
-        measureswitch.connect("state-set", self.on_measurechange)
-        topbox.append(Gtk.Label(label="Measure"))
+        topbox.append(Gtk.Label(label="Power:"))
+        topbox.append(pwrbutton := Gtk.ToggleButton(label="\u23FB"))
+        pwrbutton.set_valign(Gtk.Align.CENTER)
+        pwrbutton.set_active(False)
+        pwrbutton.connect("clicked", self.on_pwrchange)
+        topbox.append(Gtk.Label(label="Measure:"))
+        topbox.append(measurebtn := Gtk.ToggleButton(label="🗠"))
+        measurebtn.set_valign(Gtk.Align.CENTER)
+        measurebtn.set_active(False)
+        measurebtn.connect("clicked", self.on_measurechange)
+        topbox.append(Gtk.Label(label="Voltage:"))
         self.voltage = Gtk.SpinButton(orientation=Gtk.Orientation.HORIZONTAL)
         topbox.append(self.voltage)
         self.voltage.props.adjustment = Gtk.Adjustment(
@@ -128,6 +129,10 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.voltage.set_numeric(True)
         self.voltage.set_value(self.vdd)
         self.voltage.connect("value-changed", self.on_voltage)
+        topbox.append(Gtk.Label(label="Current (mA):"))
+        self.current = Gtk.Label()
+        self.current.set_text("  0.000")
+        topbox.append(self.current)
 
         box.append(midbox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL))
         spacepad(midbox)
@@ -221,12 +226,14 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         if keyval == Gdk.KEY_q and state & Gdk.ModifierType.CONTROL_MASK:
             self.close()
 
-    def on_pwrchange(self, switch: Gtk.Widget, state: bool) -> None:
+    def on_pwrchange(self, button: Gtk.ToggleButton) -> None:
+        state = button.get_active()
         print("power", "on" if state else "off")
         if self.ppk:
             self.ppk.send(PPK2Cmd.DEVICE_RUNNING_SET, int(state))
 
-    def on_measurechange(self, switch: Gtk.Widget, state: bool) -> None:
+    def on_measurechange(self, button: Gtk.ToggleButton) -> None:
+        state = button.get_active()
         print("measuring" if state else "stopped")
         if self.ppk:
             self.ppk.send(
@@ -272,8 +279,8 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
             self.count = 0
             self.amps = self.avg * 0.1 + self.amps * 0.9
             self.ampcount += 1
-            if self.ampcount >= 10:
-                # self.amplabel.set_value
+            if self.ampcount >= 50:
+                self.current.set_text(f"{(self.amps * 1000.0):8.3f}")
                 self.ampcount = 0
             self.graph.queue_draw()
         return True
