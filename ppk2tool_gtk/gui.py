@@ -25,6 +25,18 @@ from gi.repository import (  # type: ignore [import-untyped]
 from ppk2tool import *
 from .graph import Graph
 
+CSS = """
+.on {
+    font-weight: bold;
+    color: white;
+    background-color: green;
+}
+.off {
+    color: gray;
+    text-decoration: line-through;
+}
+"""
+
 
 def spacepad(what: Gtk.Widget) -> None:
     what.set_spacing(5)
@@ -99,6 +111,14 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         kctrl.connect("key-pressed", self.on_keypress, None)
         self.add_controller(kctrl)
 
+        css = Gtk.CssProvider()
+        css.load_from_data(CSS)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
+
         self.set_titlebar(titlebar := Gtk.HeaderBar())
         titlebar.pack_start(about_button := Gtk.Button(label="About"))
         about_button.set_icon_name("help-about-symbolic")
@@ -110,13 +130,15 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         spacepad(topbox)
         topbox.set_spacing(5)
         topbox.append(Gtk.Label(label="Power:"))
-        topbox.append(pwrbutton := Gtk.ToggleButton(label="\u23FB"))
+        topbox.append(pwrbutton := Gtk.ToggleButton(label="\u23fb"))
         pwrbutton.set_valign(Gtk.Align.CENTER)
+        pwrbutton.set_css_classes(["off"])
         pwrbutton.set_active(False)
         pwrbutton.connect("clicked", self.on_pwrchange)
         topbox.append(Gtk.Label(label="Measure:"))
         topbox.append(measurebtn := Gtk.ToggleButton(label="🗠"))
         measurebtn.set_valign(Gtk.Align.CENTER)
+        measurebtn.set_css_classes(["off"])
         measurebtn.set_active(False)
         measurebtn.connect("clicked", self.on_measurechange)
         topbox.append(Gtk.Label(label="Voltage:"))
@@ -151,7 +173,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         )
         self.findppk()
 
-    def show_about(self, button) -> None:
+    def show_about(self, button: Gtk.Button) -> None:
         # print("About button pressed")
         dialog = Adw.AboutWindow(transient_for=self)
         dialog.set_application_name("Power Profiler 2 Measurement Tool")
@@ -228,13 +250,13 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
 
     def on_pwrchange(self, button: Gtk.ToggleButton) -> None:
         state = button.get_active()
-        print("power", "on" if state else "off")
+        button.set_css_classes(["on" if state else "off"])
         if self.ppk:
             self.ppk.send(PPK2Cmd.DEVICE_RUNNING_SET, int(state))
 
     def on_measurechange(self, button: Gtk.ToggleButton) -> None:
         state = button.get_active()
-        print("measuring" if state else "stopped")
+        button.set_css_classes(["on" if state else "off"])
         if self.ppk:
             self.ppk.send(
                 PPK2Cmd.AVERAGE_START if state else PPK2Cmd.AVERAGE_STOP
@@ -246,7 +268,6 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
             self.ppk.send(
                 PPK2Cmd.REGULATOR_SET, *divmod(int(self.vdd * 1000.0), 256)
             )
-
 
     def on_ppk_result(
         self, cmd: PPK2Cmd, data: PPK2Meta | PPK2Sample | PPK2Stats
