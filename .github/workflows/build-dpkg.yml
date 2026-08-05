@@ -1,0 +1,35 @@
+---
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Preinstall Unpublished Dependency
+        run: >
+          ./ci-prepare.sh
+        env:
+          GITHUB_TOKEN: ${{ github.TOKEN }}
+        shell: bash
+
+      - name: Build Package
+        uses: crosser/ppk2tool-gtk/build-deb-action@HEAD
+        id: build
+        env:
+          DEB_BUILD_OPTIONS: noautodbgsym
+        with:
+          buildpackage-opts: --build=binary --no-sign
+          # Output defaults to debian/artifacts directory
+
+      - name: Upload Release
+        run: >
+          gh release create ${{ github.ref_name }} debian/artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ github.TOKEN }}
+        shell: bash
