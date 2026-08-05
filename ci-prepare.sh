@@ -10,5 +10,5 @@ PKG=$(basename $URL)
 
 TMP=$(mktemp -d)
 trap "rm -rf $TMP" EXIT
-curl --follow --output $TMP/$PKG $URL
+curl --location --output $TMP/$PKG $URL
 apt install -y $TMP/$PKG
