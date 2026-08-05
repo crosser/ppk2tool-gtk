@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ppk2tool-gtk"
+dynamic = ["version"]
+description = "GUI for NRF PPK2"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: Linux",
+]
+authors = [{name = "Eugene Crosser", email = "crosser@average.org"}]
+readme = "README.md"
+license = "BSD-3-Clause"
+requires-python = ">=3.9"
+dependencies = ["gi"]
+scripts = {ppk2tool-gtk = "ppk2tool_gtk.__main__:main"}
+
+[project.urls]
+Homepage = "https://www.average.org/ppk2tool.html"
+
+[tool.setuptools]
+packages = ["ppk2tool_gtk"]
+
+[tool.setuptools_scm]

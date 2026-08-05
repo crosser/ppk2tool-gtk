@@ -1,0 +1,25 @@
+Source: ppk2tool-gtk
+Section: misc
+Priority: optional
+Maintainer: Eugene Crosser <crosser@average.org>
+Standards-Version: 4.5.1
+Build-Depends: debhelper-compat (= 12),
+               dh-python,
+               python3-all,
+               pybuild-plugin-pyproject,
+               python3-setuptools,
+               python3-gi,
+               python3-ppk2tool,
+               black,
+               mypy,
+               pylint
+X-Python-Version: >= 3.9
+Homepage: https://www.average.org/ppk2tool.html
+
+Package: ppk2tool-gtk
+Architecture: any
+Depends: python3-gi,
+         python3-ppk2tool,
+         ${misc:Depends}, ${python3:Depends}
+Description: GTK4 based GUI for NRF PPK2
+ GUI to operate Nordic Semiconductor Power Profiler 2
