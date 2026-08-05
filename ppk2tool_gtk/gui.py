@@ -134,13 +134,13 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         pwrbutton.set_valign(Gtk.Align.CENTER)
         pwrbutton.set_css_classes(["off"])
         pwrbutton.set_active(False)
-        pwrbutton.connect("clicked", self.on_pwrchange)
+        pwrbutton.connect("toggled", self.on_pwrchange)
         topbox.append(Gtk.Label(label="Measure:"))
         topbox.append(measurebtn := Gtk.ToggleButton(label="🗠"))
         measurebtn.set_valign(Gtk.Align.CENTER)
         measurebtn.set_css_classes(["off"])
         measurebtn.set_active(False)
-        measurebtn.connect("clicked", self.on_measurechange)
+        measurebtn.connect("toggled", self.on_measurechange)
         topbox.append(Gtk.Label(label="Voltage:"))
         self.voltage = Gtk.SpinButton(orientation=Gtk.Orientation.HORIZONTAL)
         topbox.append(self.voltage)
@@ -155,6 +155,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.current = Gtk.Label()
         self.current.set_text("  0.000")
         topbox.append(self.current)
+        self.controls = [pwrbutton, measurebtn, self.voltage]
 
         box.append(midbox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL))
         spacepad(midbox)
@@ -206,6 +207,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
                 self.ppk.close()
             self.ppk = None
             self.bottom.set_text("zero or more than one profiler devices")
+            self.controls_active(False)
             return
 
         assert devname is not None, "listdir() returned entry None?!"
@@ -228,6 +230,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.ppk.send(PPK2Cmd.SET_POWER_MODE, 1 if self.passthrough else 2)
         self.ppk.send(PPK2Cmd.GET_META_DATA)
         self.bottom.set_text(devpath[devpath.rfind("/") + 1 :])
+        self.controls_active(True)
 
     def on_devchange(self, *args: Any, UnitNew: None | str) -> None:
         if (
@@ -247,6 +250,12 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
     ) -> None:
         if keyval == Gdk.KEY_q and state & Gdk.ModifierType.CONTROL_MASK:
             self.close()
+
+    def controls_active(self, state: bool) -> None:
+        for ctl in self.controls:
+            if not state and hasattr(ctl, "set_active"):
+                ctl.set_active(False)
+            ctl.set_sensitive(state)
 
     def on_pwrchange(self, button: Gtk.ToggleButton) -> None:
         state = button.get_active()
