@@ -96,7 +96,6 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         super().__init__(application=app, title="PPK2Tool")
 
         self.vdd: float = 3.7
-        self.passthrough: bool = False
         self.hist: deque[tuple[float, float, float]] = deque(maxlen=1000)
         self.min = 1.0
         self.max = 0.00001
@@ -155,7 +154,12 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.current = Gtk.Label()
         self.current.set_text("  0.000")
         topbox.append(self.current)
-        self.controls = [pwrbutton, measurebtn, self.voltage]
+        topbox.append(Gtk.Label(label="Passthrough:"))
+        topbox.append(passthrough := Gtk.Switch())
+        passthrough.set_valign(Gtk.Align.CENTER)
+        passthrough.set_active(False)
+        passthrough.connect("state-set", self.on_passthrough)
+        self.controls = [pwrbutton, measurebtn, self.voltage, passthrough]
 
         box.append(midbox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL))
         spacepad(midbox)
@@ -227,7 +231,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.ppk.send(
             PPK2Cmd.REGULATOR_SET, *divmod(int(self.vdd * 1000.0), 256)
         )
-        self.ppk.send(PPK2Cmd.SET_POWER_MODE, 1 if self.passthrough else 2)
+        self.ppk.send(PPK2Cmd.SET_POWER_MODE, 2)
         self.ppk.send(PPK2Cmd.GET_META_DATA)
         self.bottom.set_text(devpath[devpath.rfind("/") + 1 :])
         self.controls_active(True)
@@ -277,6 +281,10 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
             self.ppk.send(
                 PPK2Cmd.REGULATOR_SET, *divmod(int(self.vdd * 1000.0), 256)
             )
+
+    def on_passthrough(self, switch: Gtk.Switch, state: bool) -> None:
+        if self.ppk:
+            self.ppk.send(PPK2Cmd.SET_POWER_MODE, 1 if state else 2)
 
     def on_ppk_result(
         self, cmd: PPK2Cmd, data: PPK2Meta | PPK2Sample | PPK2Stats
