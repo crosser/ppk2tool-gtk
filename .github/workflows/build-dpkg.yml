@@ -11,19 +11,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Preinstall Unpublished Dependency
-        run: >
-          ./ci-prepare.sh
-        env:
-          GITHUB_TOKEN: ${{ github.TOKEN }}
-        shell: bash
-
       - name: Build Package
         uses: crosser/ppk2tool-gtk/build-deb-action@HEAD
         id: build
         env:
           DEB_BUILD_OPTIONS: noautodbgsym
         with:
+          setup-hook: ./ci-prepare.sh
           buildpackage-opts: --build=binary --no-sign
           # Output defaults to debian/artifacts directory
 
