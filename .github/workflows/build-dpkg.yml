@@ -17,6 +17,7 @@ jobs:
         env:
           DEB_BUILD_OPTIONS: noautodbgsym
         with:
+          docker-image: ubuntu
           setup-hook: ./ci-prepare.sh
           buildpackage-opts: --build=binary --no-sign
           # Output defaults to debian/artifacts directory
