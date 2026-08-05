@@ -11,9 +11,11 @@ from dbus.mainloop.glib import DBusGMainLoop  # type: ignore [import-untyped]
 from tty import setcbreak
 import gi  # type: ignore [import-untyped]
 
+gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 from gi.repository import (  # type: ignore [import-untyped]
+    Adw,
     Gdk,
     Gio,
     GLib,
@@ -97,6 +99,11 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         kctrl.connect("key-pressed", self.on_keypress, None)
         self.add_controller(kctrl)
 
+        self.set_titlebar(titlebar := Gtk.HeaderBar())
+        titlebar.pack_start(about_button := Gtk.Button(label="About"))
+        about_button.set_icon_name("help-about-symbolic")
+        about_button.connect("clicked", self.show_about)
+
         self.set_child(box := Gtk.Box(orientation=Gtk.Orientation.VERTICAL))
 
         box.append(topbox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL))
@@ -138,6 +145,24 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
             self.on_devchange, member_keyword="UnitNew"
         )
         self.findppk()
+
+    def show_about(self, button) -> None:
+        # print("About button pressed")
+        dialog = Adw.AboutWindow(transient_for=self)
+        dialog.set_application_name("Power Profiler 2 Measurement Tool")
+        dialog.set_version("?.?")
+        dialog.set_developer_name("Eugene Crosser")
+        dialog.set_license_type(Gtk.License(Gtk.License.MIT_X11))
+        dialog.set_comments("GUI for Nordic Semiconductor Power Profiler 2")
+        dialog.set_website("https://git.average.org/cgit/ppk2tool-gtk.git")
+        # dialog.set_issue_url("https://github.com/")
+        # dialog.add_credit_section("Contributors", ["Name1 url"])
+        # dialog.set_translator_credits("Name1 url")
+        dialog.set_copyright("© 2026 Eugene Crosser")
+        # dialog.set_developers(["Eugene Crosser"])
+        # icon must be uploaded in ~/.local/share/icons or /usr/share/icons
+        # dialog.set_application_icon("org.average.ppk2tool-gtk")
+        dialog.set_visible(True)
 
     def findppk(self) -> None:
         found = 0
