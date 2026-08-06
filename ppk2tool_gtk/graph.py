@@ -4,25 +4,20 @@ GTK4 GUI for ppk2tool
 
 from collections import deque
 from math import log10
-from typing import Any, Callable, Literal
 
-from dbus import SystemBus, String  # type: ignore [import-untyped]
-from dbus.mainloop.glib import DBusGMainLoop  # type: ignore [import-untyped]
-from tty import setcbreak
 import gi  # type: ignore [import-untyped]
 
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
 gi.require_version("Graphene", "1.0")
 gi.require_version("Pango", "1.0")
+# pylint: disable=wrong-import-position
 from gi.repository import (  # type: ignore [import-untyped]
     Gdk,
     Gtk,
     Graphene,
     Pango,
 )
-
-from ppk2tool import *
 
 D_WIDTH = 800
 D_HEIGHT = 400
@@ -38,6 +33,7 @@ LABELS = {
 
 
 def spacepad(what: Gtk.Widget) -> None:
+    """Set spacing for a widget"""
     what.set_spacing(5)
     what.set_margin_top(5)
     what.set_margin_bottom(5)
@@ -46,6 +42,8 @@ def spacepad(what: Gtk.Widget) -> None:
 
 
 class Graph(Gtk.Widget):  # type: ignore [misc]
+    """Graph pane"""
+
     def __init__(self, hist: deque[tuple[float, float, float]]) -> None:
         super().__init__()
         self.hist = hist
@@ -53,6 +51,7 @@ class Graph(Gtk.Widget):  # type: ignore [misc]
         # self.set_vexpand(True)
         self.set_size_request(D_WIDTH, D_HEIGHT)
 
+    # pylint: disable=too-many-statements,too-many-locals,arguments-differ
     def do_snapshot(self, s: Graphene.Snapshot) -> None:
         w = self.get_width()
         h = self.get_height()

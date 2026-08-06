@@ -8,16 +8,15 @@ import sys
 import gi  # type: ignore [import-untyped]
 
 gi.require_version("Adw", "1")
-
-from gi.repository import Adw, Gdk, Gtk  # type: ignore [import-untyped]
-
+# pylint: disable=wrong-import-position
+from gi.repository import Adw, Gtk  # type: ignore [import-untyped]
 from .gui import MainWindow
 
 
 class PPK2App(Adw.Application):  # type: ignore [misc]
     """GTK4 Application"""
 
-    def do_activate(self) -> None:
+    def do_activate(self) -> None:  # pylint: disable=arguments-differ
         MainWindow(self).present()
 
 

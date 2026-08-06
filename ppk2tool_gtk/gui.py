@@ -4,25 +4,25 @@ GTK4 GUI for ppk2tool: window and widgets
 
 from collections import deque
 import os
+from tty import setcbreak
 from typing import Any, Callable, Literal
 
-from dbus import SystemBus, String  # type: ignore [import-untyped]
+from dbus import SystemBus  # type: ignore [import-untyped]
 from dbus.mainloop.glib import DBusGMainLoop  # type: ignore [import-untyped]
-from tty import setcbreak
 import gi  # type: ignore [import-untyped]
 
 gi.require_version("Adw", "1")
 gi.require_version("Gdk", "4.0")
 gi.require_version("Gtk", "4.0")
+# pylint: disable=wrong-import-position
 from gi.repository import (  # type: ignore [import-untyped]
     Adw,
     Gdk,
-    Gio,
     GLib,
     Gtk,
 )
 
-from ppk2tool import *
+from ppk2tool import *  # pylint: disable=wildcard-import,unused-wildcard-import
 from .graph import Graph
 
 CSS = """
@@ -37,6 +37,8 @@ CSS = """
 }
 """
 
+# pylint: disable=missing-function-docstring
+
 
 def spacepad(what: Gtk.Widget) -> None:
     what.set_spacing(5)
@@ -47,6 +49,8 @@ def spacepad(what: Gtk.Widget) -> None:
 
 
 class PPK2Source(GLib.Source):  # type: ignore [misc]
+    """Glib event source wrapped over PPK2 context"""
+
     def __init__(
         self,
         devpath: str,
@@ -56,7 +60,7 @@ class PPK2Source(GLib.Source):  # type: ignore [misc]
     ) -> None:
         super().__init__()
         self.buffer = bytearray(1024)
-        self.tty = open(
+        self.tty = open(  # pylint: disable=consider-using-with
             devpath,
             "rb+",
             buffering=0,
@@ -92,6 +96,9 @@ class PPK2Source(GLib.Source):  # type: ignore [misc]
 
 
 class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
+    """Main application window"""
+
+    # pylint: disable=too-many-statements,too-many-instance-attributes
     def __init__(self, app: Gtk.Application):
         super().__init__(application=app, title="PPK2Tool")
 
@@ -104,6 +111,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         self.amps = 0.0
         self.ampcount = 0
         self.ppk: None | PPK2Source = None
+        self.metadata: PPK2Meta | PPK2Sample | PPK2Stats | None = None
         GLib.timeout_add(10, self.periodic, None)
 
         kctrl = Gtk.EventControllerKey()
@@ -178,7 +186,7 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
         )
         self.findppk()
 
-    def show_about(self, button: Gtk.Button) -> None:
+    def show_about(self, _button: Gtk.Button) -> None:
         # print("About button pressed")
         dialog = Adw.AboutWindow(transient_for=self)
         dialog.set_application_name("Power Profiler 2 Measurement Tool")
@@ -222,9 +230,9 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
                     "ignoring devchange event for an already open ppk", devpath
                 )
                 return
-            else:
-                print("new device, closing the old one")
-                self.ppk.close()
+
+            print("new device, closing the old one")
+            self.ppk.close()
 
         self.ppk = PPK2Source(devpath, self.on_ppk_result)
         self.ppk.attach(GLib.MainContext.default())
@@ -282,12 +290,12 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
                 PPK2Cmd.REGULATOR_SET, *divmod(int(self.vdd * 1000.0), 256)
             )
 
-    def on_passthrough(self, switch: Gtk.Switch, state: bool) -> None:
+    def on_passthrough(self, _switch: Gtk.Switch, state: bool) -> None:
         if self.ppk:
             self.ppk.send(PPK2Cmd.SET_POWER_MODE, 1 if state else 2)
 
     def on_ppk_result(
-        self, cmd: PPK2Cmd, data: PPK2Meta | PPK2Sample | PPK2Stats
+        self, _cmd: PPK2Cmd, data: PPK2Meta | PPK2Sample | PPK2Stats
     ) -> None:
         if isinstance(data, PPK2Meta):
             self.metadata = data
@@ -296,10 +304,8 @@ class MainWindow(Gtk.ApplicationWindow):  # type: ignore [misc]
             self.voltage.set_value(self.vdd)
         elif isinstance(data, PPK2Sample):
             # print(data)
-            if data.amps > self.max:
-                self.max = data.amps
-            if data.amps < self.min:
-                self.min = data.amps
+            self.max = max(self.max, data.amps)
+            self.min = min(self.min, data.amps)
             self.avg = self.avg * 0.8 + data.amps * 0.2
             self.count += 1
         elif isinstance(data, PPK2Stats):
