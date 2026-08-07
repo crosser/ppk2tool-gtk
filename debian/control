@@ -10,6 +10,10 @@ Build-Depends: debhelper-compat (= 12),
                python3-setuptools,
                python3-dbus,
                python3-gi,
+               gir1.2-gtk-4.0,
+               gir1.2-adw-1,
+               gir1.2-graphene-1.0,
+               gir1.2-pango-1.0,
                python3-ppk2tool,
                black,
                mypy,
@@ -19,8 +23,8 @@ Homepage: https://www.average.org/ppk2tool.html
 
 Package: ppk2tool-gtk
 Architecture: any
-Depends: python3-gi,
-         python3-dbus,
+Depends: python3-dbus,
+         python3-gi,
          python3-ppk2tool,
          ${misc:Depends}, ${python3:Depends}
 Description: GTK4 based GUI for NRF PPK2
