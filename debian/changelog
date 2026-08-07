@@ -1,3 +1,12 @@
+ppk2tool-gtk (0.3) unstable; urgency=medium
+
+  * Expand README and add a screenshot
+  * Expand README
+  * Add pylint test and address its findings
+  * add gir build dependency for pylint test
+
+ -- Eugene Crosser <crosser@average.org>  Fri, 07 Aug 2026 23:12:01 +0200
+
 ppk2tool-gtk (0.2) unstable; urgency=medium
 
   * Add style tests
